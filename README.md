@@ -21,13 +21,17 @@ Une application iOS native pour gérer vos tests de produits tech avec style.
 ### Fonctionnalités avancées
 - 📸 **Photos de produits** : Ajoutez des photos depuis la caméra, galerie ou web
 - 📝 **Notes détaillées** : Ajoutez des notes pour chaque test
-- ☁️ **iCloud Ready** : Préparé pour la synchronisation iCloud
+- ☁️ **Synchronisation Firebase** : Vos tests synchronisés sur tous vos appareils en temps réel (Nouveau v1.2.0)
+- 🔐 **Authentification multi-plateforme** : Connexion email, anonyme, ou compte Apple/Google (Nouveau v1.2.0)
+- 🔄 **Sync temps réel** : Les modifications apparaissent instantanément sur tous vos appareils (Nouveau v1.2.0)
 
 ## 🛠 Technologies
 
 - **SwiftUI** : Interface utilisateur native
-- **CloudKit** : Synchronisation iCloud (sécurisée)
-- **UserDefaults** : Cache local rapide
+- **Firebase** : Backend et authentification
+  - **Firebase Auth** : Authentification sécurisée multi-méthodes
+  - **Cloud Firestore** : Base de données temps réel
+  - **Firebase Analytics** : Statistiques d'utilisation
 - **iOS 26** : Dernières APIs Apple
 
 ## 📱 Captures d'écran
@@ -42,12 +46,20 @@ L'app inclut :
 ## 🚀 Installation
 
 1. Clonez le projet
-2. Ouvrez `ReviewToDo.xcodeproj` dans Xcode
-3. Lancez sur simulateur ou appareil iOS
+2. Ouvrez `ReviewToDoAPp.xcodeproj` dans Xcode
+3. Ajoutez votre fichier `GoogleService-Info.plist` depuis Firebase Console
+4. Lancez sur simulateur ou appareil iOS
 
 ## 📦 Versions
 
-### v1.1.0 (Actuelle)
+### v1.2.0 (Actuelle)
+- ☁️ **Synchronisation Firebase** : Vos données synchronisées en temps réel sur tous vos appareils
+- 🔐 **Authentification sécurisée** : Connexion par email/mot de passe, anonyme, ou via Apple/Google
+- 🔄 **Sync temps réel** : Modifications instantanées sur tous vos appareils
+- 🚪 **Bouton de déconnexion** : Déconnectez-vous facilement depuis l'app
+- 📊 **Firebase Analytics** : Suivi des statistiques d'utilisation
+
+### v1.1.0
 - ✨ Édition des produits par tap sur carte
 - 🗑️ Suppression par swipe vers la gauche
 - 🎉 Animation confetti lors de la complétion
@@ -64,8 +76,9 @@ L'app inclut :
 
 - 📱 Version iPad optimisée
 - 💻 Version macOS
-- ☁️ Synchronisation iCloud complète
-- 📊 Statistiques et rapports
+- 🍎 Connexion avec Apple
+- 🔍 Connexion avec Google
+- 📊 Statistiques et rapports avancés
 - 🔔 Notifications et rappels
 
 ---
