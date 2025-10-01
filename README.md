@@ -9,6 +9,8 @@ Une application iOS native pour gérer vos tests de produits tech avec style.
 - ✏️ **Édition rapide** : Tap sur une carte pour éditer (Nouveau v1.1.0)
 - 🗑️ **Suppression par swipe** : Swipe vers la gauche pour supprimer (Nouveau v1.1.0)
 - 🎉 **Animation confetti** : Célébrez chaque test complété avec des confettis colorés (Nouveau v1.1.0)
+- 📅 **Dates d'échéance** : Définissez des dates limites pour vos tests (Nouveau v1.4.0)
+- 🔔 **Rappels automatiques** : Notifications push 1 jour avant l'échéance (Nouveau v1.4.0)
 
 ### Interface & Design
 - 🎯 **Priorités visuelles** : Système de priorités avec emojis (🔴 Urgente, 🟠 Élevée, 🟡 Moyenne, 🟢 Faible)
@@ -17,6 +19,7 @@ Une application iOS native pour gérer vos tests de produits tech avec style.
 - 🎨 **Sélecteur moderne** : Catégories en scroll horizontal tactile (Nouveau v1.1.0)
 - 🌙 **Mode sombre** : Interface dark élégante avec gradient
 - ✨ **Animations fluides** : Transitions et retours haptiques améliorés (Nouveau v1.1.0)
+- 🏷️ **Badges d'échéance** : Indicateurs visuels colorés (rouge=retard, orange=urgent, gris=normal) (Nouveau v1.4.0)
 
 ### Fonctionnalités avancées
 - 📸 **Photos de produits** : Ajoutez des photos depuis la caméra, galerie ou web
@@ -54,7 +57,17 @@ L'app inclut :
 
 ## 📦 Versions
 
-### v1.3.0 (Actuelle)
+### v1.4.0 (Actuelle)
+- 📅 **Dates d'échéance et rappels** :
+  - DatePicker graphique dans les formulaires d'ajout et édition
+  - Toggle pour activer/désactiver une date limite
+  - Badges visuels colorés sur les cartes (rouge=retard, orange=urgent, gris=normal)
+  - Formatage intelligent des dates (Aujourd'hui, Demain, Dans Xj, En retard de Xj)
+  - Notifications push automatiques 1 jour avant l'échéance à 9h
+  - Gestion automatique des notifications (ajout/modification/suppression)
+- 🔔 **Système de notifications** : Demande de permission au lancement, badge sur l'icône de l'app
+
+### v1.3.0
 - 🔑 **Gestion complète des mots de passe** :
   - Récupération par email via "Mot de passe oublié ?"
   - Changement de mot de passe depuis les Paramètres
@@ -91,7 +104,6 @@ L'app inclut :
 - 🍎 Connexion avec Apple
 - 🔍 Connexion avec Google
 - 📊 Statistiques et rapports avancés
-- 🔔 Notifications et rappels
 
 ---
 

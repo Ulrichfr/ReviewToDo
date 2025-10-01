@@ -145,6 +145,7 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             dataManager.loadTests()
+            requestNotificationPermission()
         }
         .onChange(of: dataManager.hasLoadedData) {
             if dataManager.hasLoadedData {
@@ -173,6 +174,17 @@ struct ContentView: View {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             showOnboarding = true
+        }
+    }
+
+    private func requestNotificationPermission() {
+        Task {
+            let granted = await NotificationManager.shared.requestAuthorization()
+            if granted {
+                print("✅ Notification permission granted")
+            } else {
+                print("❌ Notification permission denied")
+            }
         }
     }
 
@@ -831,12 +843,56 @@ struct TestRowView: View {
                         .foregroundColor(AppTheme.textSecondary)
                         .lineLimit(2)
                 }
+
+                if let dueDate = test.dueDate {
+                    dueDateBadge(for: dueDate)
+                }
             }
         }
         .padding(.vertical, 22)
         .padding(.horizontal, 20)
         .cardStyle(isCompleted: test.isCompleted)
         .animation(.appSpring, value: test.isCompleted)
+    }
+
+    @ViewBuilder
+    private func dueDateBadge(for date: Date) -> some View {
+        let daysUntilDue = Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 0
+        let isOverdue = daysUntilDue < 0
+        let isUrgent = daysUntilDue >= 0 && daysUntilDue <= 2
+
+        HStack(spacing: 6) {
+            Image(systemName: isOverdue ? "exclamationmark.triangle.fill" : "calendar")
+                .font(.caption2)
+                .foregroundColor(isOverdue ? .red : (isUrgent ? .orange : AppTheme.textSecondary))
+
+            Text(formattedDueDate(date, daysUntil: daysUntilDue))
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(isOverdue ? .red : (isUrgent ? .orange : AppTheme.textSecondary))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            Capsule()
+                .fill(isOverdue ? Color.red.opacity(0.15) : (isUrgent ? Color.orange.opacity(0.15) : Color.white.opacity(0.05)))
+        )
+    }
+
+    private func formattedDueDate(_ date: Date, daysUntil: Int) -> String {
+        if daysUntil < 0 {
+            return "En retard de \(-daysUntil)j"
+        } else if daysUntil == 0 {
+            return "Aujourd'hui"
+        } else if daysUntil == 1 {
+            return "Demain"
+        } else if daysUntil <= 7 {
+            return "Dans \(daysUntil)j"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            return formatter.string(from: date)
+        }
     }
 }
 
@@ -953,6 +1009,11 @@ class DataManager: ObservableObject {
             let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
             try await collection.document(test.id).setData(dict)
             iCloudStatus = "☁️ Synchronisé"
+
+            // Schedule notification if test has due date
+            if test.dueDate != nil {
+                await NotificationManager.shared.scheduleNotification(for: test)
+            }
         } catch {
             print("Erreur ajout: \(error.localizedDescription)")
             iCloudStatus = "⚠️ Erreur sync"
@@ -967,6 +1028,13 @@ class DataManager: ObservableObject {
             let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
             try await collection.document(test.id).setData(dict, merge: true)
             iCloudStatus = "☁️ Synchronisé"
+
+            // Update notification
+            if test.dueDate != nil {
+                await NotificationManager.shared.scheduleNotification(for: test)
+            } else {
+                await NotificationManager.shared.cancelNotification(for: test.id)
+            }
         } catch {
             print("Erreur update: \(error.localizedDescription)")
             iCloudStatus = "⚠️ Erreur sync"
@@ -979,6 +1047,9 @@ class DataManager: ObservableObject {
         do {
             try await collection.document(test.id).delete()
             iCloudStatus = "☁️ Synchronisé"
+
+            // Cancel notification
+            await NotificationManager.shared.cancelNotification(for: test.id)
         } catch {
             print("Erreur suppression: \(error.localizedDescription)")
             iCloudStatus = "⚠️ Erreur sync"
@@ -1000,6 +1071,8 @@ struct EditTestView: View {
     @State private var selectedCategory: String
     @State private var selectedPriority: String
     @State private var notes: String
+    @State private var dueDate: Date
+    @State private var hasDueDate: Bool
     @State private var photoData: Data?
     @State private var showingImagePicker = false
     @State private var showingCamera = false
@@ -1021,6 +1094,8 @@ struct EditTestView: View {
         self._selectedPriority = State(initialValue: test.wrappedValue.priority)
         self._notes = State(initialValue: test.wrappedValue.notes)
         self._photoData = State(initialValue: test.wrappedValue.photoData)
+        self._dueDate = State(initialValue: test.wrappedValue.dueDate ?? Date().addingTimeInterval(7*24*60*60))
+        self._hasDueDate = State(initialValue: test.wrappedValue.dueDate != nil)
     }
 
     var body: some View {
@@ -1033,6 +1108,7 @@ struct EditTestView: View {
                     VStack(spacing: 24) {
                         informationSection
                         photoSection
+                        dueDateSection
                         categorySection
                         prioritySection
                     }
@@ -1288,6 +1364,33 @@ struct EditTestView: View {
         .disabled(name.isEmpty || brand.isEmpty)
     }
 
+    private var dueDateSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Date d'échéance")
+                .font(.headline)
+                .foregroundColor(AppTheme.textPrimary)
+
+            Toggle(isOn: $hasDueDate) {
+                Text("Définir une date limite")
+                    .foregroundColor(AppTheme.textSecondary)
+            }
+            .tint(.orange)
+
+            if hasDueDate {
+                DatePicker(
+                    "Date",
+                    selection: $dueDate,
+                    in: Date()...,
+                    displayedComponents: [.date]
+                )
+                .datePickerStyle(.graphical)
+                .tint(.orange)
+            }
+        }
+        .padding(20)
+        .glassSurface()
+    }
+
     private func saveTest() {
         HapticManager.notification(.success)
         test.name = name
@@ -1296,6 +1399,7 @@ struct EditTestView: View {
         test.priority = selectedPriority
         test.notes = notes
         test.photoData = photoData
+        test.dueDate = hasDueDate ? dueDate : nil
         onSave()
         presentationMode.wrappedValue.dismiss()
     }
@@ -1372,6 +1476,8 @@ struct AddTestView: View {
     @State private var selectedCategory: String = "📱 Smartphone"
     @State private var selectedPriority: String = "🟡 Moyenne"
     @State private var notes: String = ""
+    @State private var dueDate: Date = Date().addingTimeInterval(7*24*60*60) // 7 jours par défaut
+    @State private var hasDueDate: Bool = false
     @State private var photoData: Data?
     @State private var showingImagePicker = false
     @State private var showingCamera = false
@@ -1395,6 +1501,7 @@ struct AddTestView: View {
                     VStack(spacing: 24) {
                         informationSection
                         photoSection
+                        dueDateSection
                         categorySection
                         prioritySection
                     }
@@ -1650,6 +1757,33 @@ struct AddTestView: View {
         .disabled(name.isEmpty || brand.isEmpty)
     }
 
+    private var dueDateSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Date d'échéance")
+                .font(.headline)
+                .foregroundColor(AppTheme.textPrimary)
+
+            Toggle(isOn: $hasDueDate) {
+                Text("Définir une date limite")
+                    .foregroundColor(AppTheme.textSecondary)
+            }
+            .tint(.orange)
+
+            if hasDueDate {
+                DatePicker(
+                    "Date",
+                    selection: $dueDate,
+                    in: Date()...,
+                    displayedComponents: [.date]
+                )
+                .datePickerStyle(.graphical)
+                .tint(.orange)
+            }
+        }
+        .padding(20)
+        .glassSurface()
+    }
+
     private func saveTest() {
         HapticManager.notification(.success)
         var newTest = ProductTest(
@@ -1660,6 +1794,7 @@ struct AddTestView: View {
             notes: notes
         )
         newTest.photoData = photoData
+        newTest.dueDate = hasDueDate ? dueDate : nil
         onSave(newTest)
         presentationMode.wrappedValue.dismiss()
     }
