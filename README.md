@@ -107,4 +107,4 @@ L'app inclut :
 
 ---
 
-**Créé avec ❤️ et Claude Code**
+**Créé avec ❤️**

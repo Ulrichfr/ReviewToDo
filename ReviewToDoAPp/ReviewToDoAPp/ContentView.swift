@@ -116,7 +116,9 @@ struct ContentView: View {
     @State private var selectedTab = 0
     @State private var showOnboarding = false
     @State private var showSettings = false
+    @State private var showNotificationPrompt = false
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @AppStorage("hasAskedNotificationPermission") private var hasAskedNotificationPermission = false
 
     var body: some View {
         ZStack {
@@ -145,7 +147,7 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             dataManager.loadTests()
-            requestNotificationPermission()
+            checkNotificationPermission()
         }
         .onChange(of: dataManager.hasLoadedData) {
             if dataManager.hasLoadedData {
@@ -157,6 +159,15 @@ struct ContentView: View {
                 showOnboarding = false
                 hasSeenOnboarding = true
             }
+        }
+        .sheet(isPresented: $showNotificationPrompt) {
+            NotificationPromptView(onAllow: {
+                showNotificationPrompt = false
+                requestNotificationPermission()
+            }, onSkip: {
+                showNotificationPrompt = false
+                hasAskedNotificationPermission = true
+            })
         }
     }
 
@@ -177,9 +188,20 @@ struct ContentView: View {
         }
     }
 
+    private func checkNotificationPermission() {
+        // Ne demander qu'une seule fois
+        guard !hasAskedNotificationPermission else { return }
+
+        // Attendre un peu après le lancement pour ne pas être intrusif
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            showNotificationPrompt = true
+        }
+    }
+
     private func requestNotificationPermission() {
         Task {
             let granted = await NotificationManager.shared.requestAuthorization()
+            hasAskedNotificationPermission = true
             if granted {
                 print("✅ Notification permission granted")
             } else {
@@ -961,13 +983,22 @@ class DataManager: ObservableObject {
             return
         }
 
-        tests = [
-            ProductTest(name: "iPhone 15 Pro", brand: "Apple", category: "📱 Smartphone", priority: "🔴 Urgente", notes: "Test camera et performance"),
-            ProductTest(name: "Roomba j7+", brand: "iRobot", category: "🤖 Aspirateur Robot", priority: "🟡 Moyenne", notes: "Test navigation intelligente"),
-            ProductTest(name: "MacBook Air M2", brand: "Apple", category: "💻 Ordinateur", priority: "🔴 Urgente", notes: "Test autonomie et vitesse"),
-            ProductTest(name: "Anker PowerCore", brand: "Anker", category: "🔋 Batterie", priority: "🟢 Faible", notes: "Test capacité de charge"),
-            ProductTest(name: "Worx Landroid", brand: "Worx", category: "🌱 Tondeuse Robot", priority: "🟡 Moyenne", notes: "Test précision de coupe")
-        ]
+        var test1 = ProductTest(name: "iPhone 15 Pro", brand: "Apple", category: "📱 Smartphone", priority: "🔴 Urgente", notes: "Test camera et performance")
+        test1.dueDate = Calendar.current.date(byAdding: .day, value: -2, to: Date()) // En retard
+
+        var test2 = ProductTest(name: "Roomba j7+", brand: "iRobot", category: "🤖 Aspirateur Robot", priority: "🟡 Moyenne", notes: "Test navigation intelligente")
+        test2.dueDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) // Demain (urgent)
+
+        var test3 = ProductTest(name: "MacBook Air M2", brand: "Apple", category: "💻 Ordinateur", priority: "🔴 Urgente", notes: "Test autonomie et vitesse")
+        test3.dueDate = Date() // Aujourd'hui
+
+        var test4 = ProductTest(name: "Anker PowerCore", brand: "Anker", category: "🔋 Batterie", priority: "🟢 Faible", notes: "Test capacité de charge")
+        test4.dueDate = Calendar.current.date(byAdding: .day, value: 5, to: Date()) // Dans 5 jours
+
+        var test5 = ProductTest(name: "Worx Landroid", brand: "Worx", category: "🌱 Tondeuse Robot", priority: "🟡 Moyenne", notes: "Test précision de coupe")
+        // Pas de date d'échéance
+
+        tests = [test1, test2, test3, test4, test5]
 
         // Sauvegarder dans Firestore
         for test in tests {
@@ -1949,6 +1980,122 @@ struct ConfettiView: View {
             withAnimation(.easeOut(duration: 1.5)) {
                 animate = true
             }
+        }
+    }
+}
+
+// MARK: - Notification Prompt View
+struct NotificationPromptView: View {
+    let onAllow: () -> Void
+    let onSkip: () -> Void
+
+    var body: some View {
+        ZStack {
+            AppTheme.mainGradient
+                .ignoresSafeArea()
+
+            AppTheme.darkOverlay
+                .ignoresSafeArea()
+
+            VStack(spacing: 32) {
+                Spacer()
+
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.orange.opacity(0.3), Color.pink.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 120, height: 120)
+
+                    Image(systemName: "bell.badge.fill")
+                        .font(.system(size: 60))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.orange, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                // Title & Description
+                VStack(spacing: 16) {
+                    Text("Ne manquez plus aucune échéance")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+
+                    Text("Recevez une notification la veille de chaque test à réaliser pour ne jamais oublier.")
+                        .font(.body)
+                        .foregroundColor(AppTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
+
+                // Features
+                VStack(alignment: .leading, spacing: 16) {
+                    FeatureRow(icon: "calendar.badge.clock", text: "Rappel automatique 1 jour avant")
+                    FeatureRow(icon: "bell.slash.fill", text: "Désactivez quand vous voulez dans Réglages")
+                    FeatureRow(icon: "clock.fill", text: "Notification à 9h du matin")
+                }
+                .padding(.horizontal, 32)
+
+                Spacer()
+
+                // Buttons
+                VStack(spacing: 12) {
+                    Button(action: onAllow) {
+                        HStack {
+                            Image(systemName: "bell.fill")
+                                .font(.title3)
+                            Text("Activer les notifications")
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(AppTheme.buttonGradient)
+                        )
+                        .foregroundColor(.white)
+                    }
+
+                    Button(action: onSkip) {
+                        Text("Peut-être plus tard")
+                            .font(.body)
+                            .foregroundColor(AppTheme.textSecondary)
+                            .padding(.vertical, 8)
+                    }
+                }
+                .padding(.horizontal, 32)
+                .padding(.bottom, 40)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+struct FeatureRow: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(.orange)
+                .frame(width: 24)
+
+            Text(text)
+                .font(.subheadline)
+                .foregroundColor(.white)
+
+            Spacer()
         }
     }
 }
