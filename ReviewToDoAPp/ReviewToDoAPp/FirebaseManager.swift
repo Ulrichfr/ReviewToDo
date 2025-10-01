@@ -29,7 +29,7 @@ class FirebaseManager: ObservableObject {
         db = Firestore.firestore()
 
         // Observer l'état d'authentification
-        auth.addStateDidChangeListener { [weak self] _, user in
+        let _ = auth.addStateDidChangeListener { [weak self] _, user in
             DispatchQueue.main.async {
                 self?.currentUser = user
                 self?.isSignedIn = user != nil
@@ -53,6 +53,17 @@ class FirebaseManager: ObservableObject {
 
     func signOut() throws {
         try auth.signOut()
+    }
+
+    func sendPasswordReset(email: String) async throws {
+        try await auth.sendPasswordReset(withEmail: email)
+    }
+
+    func updatePassword(newPassword: String) async throws {
+        guard let user = currentUser else {
+            throw NSError(domain: "FirebaseManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "No user signed in"])
+        }
+        try await user.updatePassword(to: newPassword)
     }
 
     // MARK: - Firestore

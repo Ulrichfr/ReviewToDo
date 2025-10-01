@@ -11,7 +11,9 @@ struct AuthView: View {
     @StateObject private var firebaseManager = FirebaseManager.shared
     @State private var isLoading = false
     @State private var errorMessage = ""
+    @State private var successMessage = ""
     @State private var showEmailAuth = false
+    @State private var showResetPassword = false
     @State private var email = ""
     @State private var password = ""
     @State private var isSignUp = false
@@ -53,7 +55,9 @@ struct AuthView: View {
 
                 // Options de connexion
                 VStack(spacing: 16) {
-                    if showEmailAuth {
+                    if showResetPassword {
+                        resetPasswordView
+                    } else if showEmailAuth {
                         emailAuthView
                     } else {
                         mainAuthView
@@ -63,6 +67,13 @@ struct AuthView: View {
                         Text(errorMessage)
                             .font(.caption)
                             .foregroundColor(.red)
+                            .padding(.horizontal)
+                    }
+
+                    if !successMessage.isEmpty {
+                        Text(successMessage)
+                            .font(.caption)
+                            .foregroundColor(.green)
                             .padding(.horizontal)
                     }
 
@@ -116,17 +127,23 @@ struct AuthView: View {
             }
             .disabled(isLoading)
 
-            Button(action: signInAnonymously) {
-                HStack {
-                    Image(systemName: "person.fill.questionmark")
-                        .font(.caption)
-                    Text("Continuer sans compte")
-                        .font(.caption)
+            VStack(spacing: 8) {
+                Button(action: signInAnonymously) {
+                    HStack {
+                        Image(systemName: "person.fill.questionmark")
+                            .font(.caption)
+                        Text("Continuer sans compte")
+                            .font(.caption)
+                    }
+                    .foregroundColor(AppTheme.textSecondary)
                 }
-                .foregroundColor(AppTheme.textSecondary)
-                .padding(.top, 8)
+                .disabled(isLoading)
+
+                Text("⚠️ Mode invité : données non synchronisées")
+                    .font(.caption2)
+                    .foregroundColor(AppTheme.textSecondary.opacity(0.7))
             }
-            .disabled(isLoading)
+            .padding(.top, 8)
         }
     }
 
@@ -172,11 +189,89 @@ struct AuthView: View {
             }
             .disabled(isLoading || email.isEmpty || password.isEmpty)
 
+            HStack(spacing: 16) {
+                Button(action: {
+                    showEmailAuth = false
+                    email = ""
+                    password = ""
+                    errorMessage = ""
+                    successMessage = ""
+                }) {
+                    Text("Retour")
+                        .font(.caption)
+                        .foregroundColor(AppTheme.textSecondary)
+                }
+
+                if !isSignUp {
+                    Text("•")
+                        .foregroundColor(AppTheme.textSecondary.opacity(0.5))
+
+                    Button(action: {
+                        showEmailAuth = false
+                        showResetPassword = true
+                        password = ""
+                        errorMessage = ""
+                        successMessage = ""
+                    }) {
+                        Text("Mot de passe oublié ?")
+                            .font(.caption)
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                }
+            }
+            .padding(.top, 8)
+        }
+    }
+
+    private var resetPasswordView: some View {
+        VStack(spacing: 16) {
+            Text("Réinitialiser le mot de passe")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .padding(.bottom, 8)
+
+            Text("Entrez votre email et nous vous enverrons un lien pour réinitialiser votre mot de passe.")
+                .font(.subheadline)
+                .foregroundColor(AppTheme.textSecondary)
+                .multilineTextAlignment(.center)
+
+            TextField("Email", text: $email)
+                .textContentType(.emailAddress)
+                .keyboardType(.emailAddress)
+                .autocapitalization(.none)
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.1))
+                )
+                .foregroundColor(.white)
+
+            Button(action: resetPassword) {
+                HStack {
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text("Envoyer le lien")
+                            .fontWeight(.semibold)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(AppTheme.buttonGradient)
+                )
+                .foregroundColor(.white)
+            }
+            .disabled(isLoading || email.isEmpty)
+
             Button(action: {
-                showEmailAuth = false
+                showResetPassword = false
                 email = ""
-                password = ""
                 errorMessage = ""
+                successMessage = ""
             }) {
                 Text("Retour")
                     .font(.caption)
@@ -237,6 +332,24 @@ struct AuthView: View {
             } catch {
                 HapticManager.notification(.error)
                 errorMessage = "Impossible de créer le compte. Email déjà utilisé ?"
+            }
+            isLoading = false
+        }
+    }
+
+    private func resetPassword() {
+        isLoading = true
+        errorMessage = ""
+        successMessage = ""
+
+        Task {
+            do {
+                try await firebaseManager.sendPasswordReset(email: email)
+                HapticManager.notification(.success)
+                successMessage = "Email envoyé ! Vérifiez votre boîte mail."
+            } catch {
+                HapticManager.notification(.error)
+                errorMessage = "Impossible d'envoyer l'email. Vérifiez l'adresse."
             }
             isLoading = false
         }

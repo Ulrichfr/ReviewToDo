@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import FirebaseFirestore
+import FirebaseAuth
 
 // MARK: - Theme Colors
 struct AppTheme {
@@ -113,6 +114,9 @@ struct ContentView: View {
     @State private var showingAddTest = false
     @State private var editingTest: ProductTest?
     @State private var selectedTab = 0
+    @State private var showOnboarding = false
+    @State private var showSettings = false
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
 
     var body: some View {
         ZStack {
@@ -142,6 +146,34 @@ struct ContentView: View {
         .onAppear {
             dataManager.loadTests()
         }
+        .onChange(of: dataManager.hasLoadedData) {
+            if dataManager.hasLoadedData {
+                checkFirstLaunch()
+            }
+        }
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingView {
+                showOnboarding = false
+                hasSeenOnboarding = true
+            }
+        }
+    }
+
+    private func checkFirstLaunch() {
+        // Afficher l'onboarding uniquement si :
+        // 1. Pas encore vu
+        // 2. Utilisateur connecté (pas anonyme)
+        // 3. Liste vide (premier lancement)
+        guard !hasSeenOnboarding,
+              let user = FirebaseManager.shared.currentUser,
+              !user.isAnonymous,
+              dataManager.tests.isEmpty else {
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            showOnboarding = true
+        }
     }
 
     private var pendingTestsView: some View {
@@ -156,6 +188,13 @@ struct ContentView: View {
 
                 ScrollView {
                     VStack(spacing: 0) {
+                        // Warning pour mode anonyme
+                        if let user = FirebaseManager.shared.currentUser, user.isAnonymous {
+                            anonymousWarningBanner
+                                .padding(.horizontal, 16)
+                                .padding(.top, 8)
+                        }
+
                         urgentTestWidget
                             .padding(.top, 8)
 
@@ -163,7 +202,9 @@ struct ContentView: View {
                         ForEach(dataManager.pendingTests, id: \.id) { test in
                             if let index = dataManager.tests.firstIndex(where: { $0.id == test.id }) {
                                 TestRowView(test: $dataManager.tests[index]) {
-                                    dataManager.saveTests()
+                                    Task {
+                                        await dataManager.updateTest(dataManager.tests[index])
+                                    }
                                 }
                                 .onTapGesture {
                                     HapticManager.impact(.light)
@@ -172,9 +213,12 @@ struct ContentView: View {
                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     Button(role: .destructive) {
                                         HapticManager.notification(.warning)
-                                        withAnimation(.appSpring) {
+                                        let testToDelete = dataManager.tests[index]
+                                        let _ = withAnimation(.appSpring) {
                                             dataManager.tests.remove(at: index)
-                                            dataManager.saveTests()
+                                        }
+                                        Task {
+                                            await dataManager.deleteTest(testToDelete)
                                         }
                                     } label: {
                                         Label("Supprimer", systemImage: "trash")
@@ -190,9 +234,11 @@ struct ContentView: View {
 
                                     Button {
                                         HapticManager.notification(.success)
-                                        withAnimation(.appSpring) {
+                                        let _ = withAnimation(.appSpring) {
                                             dataManager.tests[index].isCompleted.toggle()
-                                            dataManager.saveTests()
+                                        }
+                                        Task {
+                                            await dataManager.updateTest(dataManager.tests[index])
                                         }
                                     } label: {
                                         Label("Marquer terminé", systemImage: "checkmark.circle")
@@ -200,9 +246,12 @@ struct ContentView: View {
 
                                     Button(role: .destructive) {
                                         HapticManager.notification(.warning)
-                                        withAnimation(.appSpring) {
+                                        let testToDelete = dataManager.tests[index]
+                                        let _ = withAnimation(.appSpring) {
                                             dataManager.tests.remove(at: index)
-                                            dataManager.saveTests()
+                                        }
+                                        Task {
+                                            await dataManager.deleteTest(testToDelete)
                                         }
                                     } label: {
                                         Label("Supprimer", systemImage: "trash")
@@ -227,14 +276,9 @@ struct ContentView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: {
                         HapticManager.impact(.light)
-                        do {
-                            try FirebaseManager.shared.signOut()
-                            HapticManager.notification(.success)
-                        } catch {
-                            HapticManager.notification(.error)
-                        }
+                        showSettings = true
                     }) {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                        Image(systemName: "gearshape.fill")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(AppTheme.textSecondary)
                     }
@@ -261,22 +305,58 @@ struct ContentView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .sheet(isPresented: $showingAddTest) {
                 AddTestView { newTest in
-                    withAnimation(.appSpring) {
-                        HapticManager.notification(.success)
-                        dataManager.tests.append(newTest)
-                        dataManager.saveTests()
+                    HapticManager.notification(.success)
+                    Task {
+                        await dataManager.addTest(newTest)
                     }
                 }
             }
             .sheet(item: $editingTest) { test in
                 if let index = dataManager.tests.firstIndex(where: { $0.id == test.id }) {
                     EditTestView(test: $dataManager.tests[index]) {
-                        dataManager.saveTests()
+                        Task {
+                            await dataManager.updateTest(dataManager.tests[index])
+                        }
                     }
                 }
             }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+            }
         }
         .navigationViewStyle(StackNavigationViewStyle())
+    }
+
+    @ViewBuilder
+    private var anonymousWarningBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
+                .font(.title3)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Mode Invité")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+
+                Text("Vos données seront perdues si vous vous déconnectez. Créez un compte pour les sauvegarder.")
+                    .font(.caption)
+                    .foregroundColor(AppTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.orange.opacity(0.15))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                )
+        )
     }
 
     @ViewBuilder
@@ -408,7 +488,9 @@ struct ContentView: View {
                         ForEach(dataManager.completedTests, id: \.id) { test in
                             if let index = dataManager.tests.firstIndex(where: { $0.id == test.id }) {
                                 TestRowView(test: $dataManager.tests[index]) {
-                                    dataManager.saveTests()
+                                    Task {
+                                        await dataManager.updateTest(dataManager.tests[index])
+                                    }
                                 }
                                 .onTapGesture {
                                     HapticManager.impact(.light)
@@ -417,9 +499,12 @@ struct ContentView: View {
                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     Button(role: .destructive) {
                                         HapticManager.notification(.warning)
-                                        withAnimation(.appSpring) {
+                                        let testToDelete = dataManager.tests[index]
+                                        let _ = withAnimation(.appSpring) {
                                             dataManager.tests.remove(at: index)
-                                            dataManager.saveTests()
+                                        }
+                                        Task {
+                                            await dataManager.deleteTest(testToDelete)
                                         }
                                     } label: {
                                         Label("Supprimer", systemImage: "trash")
@@ -435,9 +520,11 @@ struct ContentView: View {
 
                                     Button {
                                         HapticManager.impact(.medium)
-                                        withAnimation(.appSpring) {
+                                        let _ = withAnimation(.appSpring) {
                                             dataManager.tests[index].isCompleted.toggle()
-                                            dataManager.saveTests()
+                                        }
+                                        Task {
+                                            await dataManager.updateTest(dataManager.tests[index])
                                         }
                                     } label: {
                                         Label("Marquer à faire", systemImage: "arrow.uturn.backward")
@@ -445,9 +532,12 @@ struct ContentView: View {
 
                                     Button(role: .destructive) {
                                         HapticManager.notification(.warning)
-                                        withAnimation(.appSpring) {
+                                        let testToDelete = dataManager.tests[index]
+                                        let _ = withAnimation(.appSpring) {
                                             dataManager.tests.remove(at: index)
-                                            dataManager.saveTests()
+                                        }
+                                        Task {
+                                            await dataManager.deleteTest(testToDelete)
                                         }
                                     } label: {
                                         Label("Supprimer", systemImage: "trash")
@@ -472,6 +562,126 @@ struct ContentView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .navigationViewStyle(StackNavigationViewStyle())
+    }
+}
+
+// MARK: - Onboarding View
+
+struct OnboardingView: View {
+    let onComplete: () -> Void
+
+    var body: some View {
+        ZStack {
+            AppTheme.mainGradient
+                .ignoresSafeArea()
+
+            AppTheme.darkOverlay
+                .ignoresSafeArea()
+
+            VStack(spacing: 40) {
+                Spacer()
+
+                // Logo et titre
+                VStack(spacing: 16) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 80))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.orange, .pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    Text("Bienvenue !")
+                        .font(.system(size: 42, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+
+                    Text("Gérez vos tests de produits\navec ReviewToDo")
+                        .font(.title3)
+                        .foregroundColor(AppTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+
+                // Instructions
+                VStack(spacing: 24) {
+                    OnboardingStep(
+                        icon: "plus.circle.fill",
+                        title: "Ajoutez des produits",
+                        description: "Tapez sur le + pour ajouter vos produits à tester"
+                    )
+
+                    OnboardingStep(
+                        icon: "checkmark.circle.fill",
+                        title: "Marquez comme terminé",
+                        description: "Cochez les produits testés pour les déplacer dans Terminés"
+                    )
+
+                    OnboardingStep(
+                        icon: "cloud.fill",
+                        title: "Synchronisation automatique",
+                        description: "Vos données sont sauvegardées et synchronisées sur tous vos appareils"
+                    )
+                }
+                .padding(.horizontal, 32)
+
+                Spacer()
+
+                // Bouton commencer
+                Button(action: {
+                    HapticManager.notification(.success)
+                    onComplete()
+                }) {
+                    Text("Commencer")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(AppTheme.buttonGradient)
+                        )
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 32)
+                .padding(.bottom, 60)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+struct OnboardingStep: View {
+    let icon: String
+    let title: String
+    let description: String
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 32))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.orange, .pink],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 50, height: 50)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.white)
+
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundColor(AppTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+        }
     }
 }
 
@@ -633,6 +843,7 @@ struct TestRowView: View {
 class DataManager: ObservableObject {
     @Published var tests: [ProductTest] = []
     @Published var iCloudStatus = "☁️ Firebase"
+    @Published var hasLoadedData = false
 
     private let firebaseManager = FirebaseManager.shared
     private var listener: ListenerRegistration?
@@ -676,12 +887,23 @@ class DataManager: ObservableObject {
                     }
                     self.iCloudStatus = "☁️ Synchronisé"
                 }
+                self.hasLoadedData = true
             }
         }
     }
 
     private func loadDefaultTests() {
-        guard tests.isEmpty else { return }
+        guard tests.isEmpty else {
+            hasLoadedData = true
+            return
+        }
+
+        // Charger les produits par défaut UNIQUEMENT pour les comptes anonymes
+        guard let user = firebaseManager.currentUser, user.isAnonymous else {
+            // Compte utilisateur connecté → liste vide
+            hasLoadedData = true
+            return
+        }
 
         tests = [
             ProductTest(name: "iPhone 15 Pro", brand: "Apple", category: "📱 Smartphone", priority: "🔴 Urgente", notes: "Test camera et performance"),
@@ -697,6 +919,7 @@ class DataManager: ObservableObject {
                 await addTest(test)
             }
         }
+        hasLoadedData = true
     }
 
     var pendingTests: [ProductTest] {

@@ -21,9 +21,11 @@ Une application iOS native pour gérer vos tests de produits tech avec style.
 ### Fonctionnalités avancées
 - 📸 **Photos de produits** : Ajoutez des photos depuis la caméra, galerie ou web
 - 📝 **Notes détaillées** : Ajoutez des notes pour chaque test
-- ☁️ **Synchronisation Firebase** : Vos tests synchronisés sur tous vos appareils en temps réel (Nouveau v1.2.0)
-- 🔐 **Authentification multi-plateforme** : Connexion email, anonyme, ou compte Apple/Google (Nouveau v1.2.0)
-- 🔄 **Sync temps réel** : Les modifications apparaissent instantanément sur tous vos appareils (Nouveau v1.2.0)
+- ☁️ **Synchronisation Firebase** : Vos tests synchronisés sur tous vos appareils en temps réel
+- 🔐 **Authentification multi-plateforme** : Connexion email, anonyme, ou compte Apple/Google
+- 🔄 **Sync temps réel** : Les modifications apparaissent instantanément sur tous vos appareils
+- 🔑 **Gestion des mots de passe** : Récupération et changement de mot de passe intégrés (Nouveau v1.3.0)
+- ⚙️ **Paramètres utilisateur** : Interface dédiée pour gérer votre compte (Nouveau v1.3.0)
 
 ## 🛠 Technologies
 
@@ -52,7 +54,17 @@ L'app inclut :
 
 ## 📦 Versions
 
-### v1.2.0 (Actuelle)
+### v1.3.0 (Actuelle)
+- 🔑 **Gestion complète des mots de passe** :
+  - Récupération par email via "Mot de passe oublié ?"
+  - Changement de mot de passe depuis les Paramètres
+  - Messages de confirmation et d'erreur clairs
+- ⚙️ **Écran Paramètres** : Nouvelle interface pour gérer votre compte
+- ⚠️ **Warning mode invité** : Bandeau d'avertissement pour les comptes anonymes
+- 🎓 **Onboarding** : Écran de bienvenue pour les nouveaux utilisateurs (comptes non-anonymes uniquement)
+- 🎯 **Produits pré-remplis** : Exemples automatiques pour les comptes invités seulement
+
+### v1.2.0
 - ☁️ **Synchronisation Firebase** : Vos données synchronisées en temps réel sur tous vos appareils
 - 🔐 **Authentification sécurisée** : Connexion par email/mot de passe, anonyme, ou via Apple/Google
 - 🔄 **Sync temps réel** : Modifications instantanées sur tous vos appareils
