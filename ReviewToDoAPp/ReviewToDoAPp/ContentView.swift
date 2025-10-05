@@ -110,15 +110,100 @@ extension Animation {
 }
 
 struct ContentView: View {
+    private enum PriorityFilter: CaseIterable, Hashable {
+        case all
+        case priority(String)
+
+        var title: String {
+            switch self {
+            case .all:
+                return "Toutes"
+            case .priority(let value):
+                if value.contains("🔴") { return "Urgentes" }
+                if value.contains("🟠") { return "Élevées" }
+                if value.contains("🟡") { return "Moyennes" }
+                if value.contains("🟢") { return "Faibles" }
+                return value
+            }
+        }
+
+        static var allCases: [PriorityFilter] {
+            [.all, .priority("🔴"), .priority("🟠"), .priority("🟡"), .priority("🟢")]
+        }
+    }
+
     @StateObject private var dataManager = DataManager()
     @State private var showingAddTest = false
     @State private var editingTest: ProductTest?
     @State private var selectedTab = 0
+    @State private var selectedPriorityFilter: PriorityFilter = .all
+    @State private var pendingDeletion: ProductTest?
+    @State private var showDeleteConfirmation = false
     @State private var showOnboarding = false
     @State private var showSettings = false
     @State private var showNotificationPrompt = false
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("hasAskedNotificationPermission") private var hasAskedNotificationPermission = false
+
+    private var filteredPendingTests: [ProductTest] {
+        dataManager.pendingTests.filter { test in
+            switch selectedPriorityFilter {
+            case .all:
+                return true
+            case .priority(let value):
+                return test.priority.contains(value)
+            }
+        }
+    }
+
+    private var filteredCompletedTests: [ProductTest] {
+        dataManager.completedTests.filter { test in
+            switch selectedPriorityFilter {
+            case .all:
+                return true
+            case .priority(let value):
+                return test.priority.contains(value)
+            }
+        }
+    }
+
+    private var priorityFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(PriorityFilter.allCases, id: \.self) { filter in
+                    Button {
+                        withAnimation(.appSpringFast) {
+                            selectedPriorityFilter = filter
+                        }
+                        HapticManager.selection()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(filter.title)
+                                .font(.footnote)
+                                .fontWeight(.semibold)
+
+                            if filter == selectedPriorityFilter {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.9))
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule().fill(filter == selectedPriorityFilter ? Color.white.opacity(0.2) : Color.white.opacity(0.08))
+                        )
+                        .overlay(
+                            Capsule().stroke(filter == selectedPriorityFilter ? Color.white.opacity(0.6) : Color.white.opacity(0.12), lineWidth: 1)
+                        )
+                        .foregroundColor(.white)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -153,6 +238,18 @@ struct ContentView: View {
             if dataManager.hasLoadedData {
                 checkFirstLaunch()
             }
+        }
+        .alert("Supprimer ce test ?", isPresented: $showDeleteConfirmation, presenting: pendingDeletion) { test in
+            Button("Supprimer", role: .destructive) {
+                performDeletion(of: test)
+                pendingDeletion = nil
+            }
+
+            Button("Annuler", role: .cancel) {
+                pendingDeletion = nil
+            }
+        } message: { test in
+            Text("\(test.name) est marqué comme urgent. Êtes-vous sûr de vouloir le supprimer ?")
         }
         .sheet(isPresented: $showOnboarding) {
             OnboardingView {
@@ -198,6 +295,18 @@ struct ContentView: View {
         }
     }
 
+    private func performDeletion(of test: ProductTest) {
+        guard let index = dataManager.tests.firstIndex(where: { $0.id == test.id }) else { return }
+
+        let _ = withAnimation(.appSpring) {
+            dataManager.tests.remove(at: index)
+        }
+
+        Task {
+            await dataManager.deleteTest(test)
+        }
+    }
+
     private func requestNotificationPermission() {
         Task {
             let granted = await NotificationManager.shared.requestAuthorization()
@@ -229,80 +338,91 @@ struct ContentView: View {
                                 .padding(.top, 8)
                         }
 
-                        urgentTestWidget
-                            .padding(.top, 8)
+                        if !dataManager.tests.isEmpty {
+                            priorityFilterBar
+                                .padding(.top, 16)
+                        }
 
-                        LazyVStack(spacing: 12) {
-                        ForEach(dataManager.pendingTests, id: \.id) { test in
-                            if let index = dataManager.tests.firstIndex(where: { $0.id == test.id }) {
-                                TestRowView(test: $dataManager.tests[index]) {
-                                    Task {
-                                        await dataManager.updateTest(dataManager.tests[index])
-                                    }
-                                }
-                                .onTapGesture {
-                                    HapticManager.impact(.light)
-                                    editingTest = dataManager.tests[index]
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        HapticManager.notification(.warning)
-                                        let testToDelete = dataManager.tests[index]
-                                        let _ = withAnimation(.appSpring) {
-                                            dataManager.tests.remove(at: index)
-                                        }
-                                        Task {
-                                            await dataManager.deleteTest(testToDelete)
-                                        }
-                                    } label: {
-                                        Label("Supprimer", systemImage: "trash")
-                                    }
-                                }
-                                .contextMenu {
-                                    Button {
-                                        HapticManager.selection()
-                                        editingTest = dataManager.tests[index]
-                                    } label: {
-                                        Label("Modifier", systemImage: "pencil")
-                                    }
+                        if filteredPendingTests.isEmpty {
+                            emptyPendingState
+                                .padding(.horizontal, 24)
+                                .padding(.top, 60)
+                        } else {
+                            urgentTestWidget
+                                .padding(.top, 8)
 
-                                    Button {
-                                        HapticManager.notification(.success)
-                                        let _ = withAnimation(.appSpring) {
-                                            dataManager.tests[index].isCompleted.toggle()
+                            LazyVStack(spacing: 12) {
+                                ForEach(filteredPendingTests, id: \.id) { test in
+                                    if let index = dataManager.tests.firstIndex(where: { $0.id == test.id }) {
+                                        TestRowView(test: $dataManager.tests[index]) {
+                                            Task {
+                                                await dataManager.updateTest(dataManager.tests[index])
+                                            }
                                         }
-                                        Task {
-                                            await dataManager.updateTest(dataManager.tests[index])
+                                        .onTapGesture {
+                                            HapticManager.impact(.light)
+                                            editingTest = dataManager.tests[index]
                                         }
-                                    } label: {
-                                        Label("Marquer terminé", systemImage: "checkmark.circle")
-                                    }
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                            Button(role: .destructive) {
+                                                HapticManager.notification(.warning)
+                                                let testToDelete = dataManager.tests[index]
+                                                if testToDelete.priority.contains("🔴") {
+                                                    pendingDeletion = testToDelete
+                                                    showDeleteConfirmation = true
+                                                } else {
+                                                    performDeletion(of: testToDelete)
+                                                }
+                                            } label: {
+                                                Label("Supprimer", systemImage: "trash")
+                                            }
+                                        }
+                                        .contextMenu {
+                                            Button {
+                                                HapticManager.selection()
+                                                editingTest = dataManager.tests[index]
+                                            } label: {
+                                                Label("Modifier", systemImage: "pencil")
+                                            }
 
-                                    Button(role: .destructive) {
-                                        HapticManager.notification(.warning)
-                                        let testToDelete = dataManager.tests[index]
-                                        let _ = withAnimation(.appSpring) {
-                                            dataManager.tests.remove(at: index)
+                                            Button {
+                                                HapticManager.notification(.success)
+                                                let _ = withAnimation(.appSpring) {
+                                                    dataManager.tests[index].isCompleted.toggle()
+                                                }
+                                                Task {
+                                                    await dataManager.updateTest(dataManager.tests[index])
+                                                }
+                                            } label: {
+                                                Label("Marquer terminé", systemImage: "checkmark.circle")
+                                            }
+
+                                            Button(role: .destructive) {
+                                                HapticManager.notification(.warning)
+                                                let testToDelete = dataManager.tests[index]
+                                                if testToDelete.priority.contains("🔴") {
+                                                    pendingDeletion = testToDelete
+                                                    showDeleteConfirmation = true
+                                                } else {
+                                                    performDeletion(of: testToDelete)
+                                                }
+                                            } label: {
+                                                Label("Supprimer", systemImage: "trash")
+                                            }
                                         }
-                                        Task {
-                                            await dataManager.deleteTest(testToDelete)
-                                        }
-                                    } label: {
-                                        Label("Supprimer", systemImage: "trash")
+                                        .transition(.asymmetric(
+                                            insertion: .scale.combined(with: .opacity),
+                                            removal: .scale.combined(with: .opacity)
+                                        ))
                                     }
                                 }
-                                .transition(.asymmetric(
-                                    insertion: .scale.combined(with: .opacity),
-                                    removal: .scale.combined(with: .opacity)
-                                ))
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
                     .padding(.bottom, 100)
                 }
-            }
             }
             .navigationTitle("À Faire")
             .navigationBarTitleDisplayMode(.large)
@@ -323,16 +443,18 @@ struct ContentView: View {
                         HapticManager.impact(.light)
                         showingAddTest = true
                     }) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(width: 40, height: 40)
-                            .background(
-                                Circle()
-                                    .fill(AppTheme.buttonGradient)
-                            )
-                            .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
+                        ZStack {
+                            Circle()
+                                .fill(AppTheme.buttonGradient)
+
+                            Image(systemName: "plus")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        .frame(width: 44, height: 44)
+                        .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
                     }
+                    .contentShape(Circle())
                 }
             }
             .toolbarBackground(.clear, for: .navigationBar)
@@ -474,6 +596,72 @@ struct ContentView: View {
         }
     }
 
+    private var emptyPendingState: some View {
+        let isFilterAll = selectedPriorityFilter == .all
+
+        return VStack(spacing: 28) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [AppTheme.gradientBlue.opacity(0.6), AppTheme.gradientPurple.opacity(0.6)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 120, height: 120)
+
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 48, weight: .bold))
+                    .foregroundStyle(LinearGradient(colors: [.white, .white.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing))
+            }
+
+            VStack(spacing: 10) {
+                Text(isFilterAll ? "Ajoute ton premier test" : "Aucun test pour ce filtre")
+                    .font(.system(size: 26, weight: .semibold, design: .rounded))
+                    .foregroundColor(AppTheme.textPrimary)
+
+                Text(isFilterAll ? "Crée ta première fiche produit pour commencer à organiser tes tests de gadgets ✨" : "Essaie un autre filtre ou ajoute un test avec cette priorité.")
+                    .font(.body)
+                    .foregroundColor(AppTheme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8)
+            }
+
+            Button {
+                HapticManager.notification(.success)
+                showingAddTest = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
+                    Text("Ajouter un test")
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(AppTheme.buttonGradient)
+                )
+                .foregroundColor(.white)
+                .shadow(color: Color.black.opacity(0.25), radius: 10, x: 0, y: 6)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(32)
+        .background(
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .fill(AppTheme.cardSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 32, style: .continuous)
+                        .stroke(AppTheme.cardBorder, lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.25), radius: 30, x: 0, y: 20)
+        )
+    }
+
     private var completedTestsView: some View {
         NavigationView {
             ZStack {
@@ -485,7 +673,7 @@ struct ContentView: View {
                     .ignoresSafeArea()
 
                 ScrollView {
-                    if dataManager.completedTests.isEmpty {
+                    if filteredCompletedTests.isEmpty {
                     VStack(spacing: 32) {
                         Spacer()
 
@@ -519,7 +707,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, minHeight: 400)
                 } else {
                     LazyVStack(spacing: 12) {
-                        ForEach(dataManager.completedTests, id: \.id) { test in
+                        ForEach(filteredCompletedTests, id: \.id) { test in
                             if let index = dataManager.tests.firstIndex(where: { $0.id == test.id }) {
                                 TestRowView(test: $dataManager.tests[index]) {
                                     Task {

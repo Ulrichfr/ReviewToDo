@@ -17,7 +17,7 @@ struct SettingsView: View {
     @State private var isLoading = false
     @State private var errorMessage = ""
     @State private var successMessage = ""
-    @State private var showDeleteConfirmation = false
+    @State private var showSignOutConfirmation = false
 
     var body: some View {
         NavigationView {
@@ -139,6 +139,11 @@ struct SettingsView: View {
                                 .padding(.horizontal, 20)
                         }
 
+                        if firebaseManager.currentUser != nil {
+                            accountActionsSection
+                                .padding(.horizontal, 16)
+                        }
+
                         Spacer()
                     }
                     .padding(.bottom, 100)
@@ -158,6 +163,15 @@ struct SettingsView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .alert("Se déconnecter ?", isPresented: $showSignOutConfirmation) {
+            Button("Se déconnecter", role: .destructive) {
+                signOut()
+            }
+
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Vous devrez vous reconnecter pour accéder à vos tests.")
+        }
     }
 
     private func changePassword() {
@@ -188,6 +202,54 @@ struct SettingsView: View {
                 errorMessage = "Erreur : \(error.localizedDescription)"
             }
             isLoading = false
+        }
+    }
+
+    private var accountActionsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Button(role: .destructive) {
+                HapticManager.notification(.warning)
+                showSignOutConfirmation = true
+            } label: {
+                HStack {
+                    Spacer()
+                    Text("Se déconnecter")
+                        .fontWeight(.semibold)
+                        .padding()
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.red.opacity(0.15))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                    )
+            )
+            .foregroundColor(.red)
+            .padding(.horizontal, 20)
+        }
+        .padding(.vertical, 20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(AppTheme.cardSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(AppTheme.cardBorder, lineWidth: 1)
+                )
+        )
+    }
+
+    private func signOut() {
+        do {
+            try firebaseManager.signOut()
+            HapticManager.notification(.success)
+            dismiss()
+        } catch {
+            HapticManager.notification(.error)
+            errorMessage = "Impossible de vous déconnecter : \(error.localizedDescription)"
         }
     }
 }
