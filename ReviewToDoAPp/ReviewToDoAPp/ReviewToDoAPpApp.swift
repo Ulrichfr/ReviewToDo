@@ -40,12 +40,14 @@ struct ReviewToDoAPpApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if firebaseManager.isSignedIn {
-                ContentView()
-                    .environmentObject(quickActionService)
-            } else {
-                AuthView()
+            Group {
+                if firebaseManager.isSignedIn {
+                    ContentView()
+                } else {
+                    AuthView()
+                }
             }
+            .environmentObject(quickActionService)
         }
     }
 }

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		329DEA4AF4FF39185E1BA865 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 57AB171E386C74E1C5B29C57 /* GoogleService-Info.plist */; };
 		AFB0D8EC2E8C625600047EE1 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = AFB0D8EB2E8C625600047EE1 /* FirebaseFirestore */; };
 		AFB0D8EE2E8C625D00047EE1 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = AFB0D8ED2E8C625D00047EE1 /* FirebaseAuth */; };
 		AFB0D8F02E8C626300047EE1 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = AFB0D8EF2E8C626300047EE1 /* FirebaseAnalytics */; };
@@ -15,6 +16,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		57AB171E386C74E1C5B29C57 /* GoogleService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		AF325F7F2E8C031400266633 /* ReviewToDoAPp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ReviewToDoAPp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C8D88AEEA49E624C3AF4E7AE /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = ReviewToDoAPp/Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -52,6 +54,7 @@
 				AF325F802E8C031400266633 /* Products */,
 				AFB0D8EA2E8C625600047EE1 /* Frameworks */,
 				DF085A39DC2A5785E8B75C31 /* ReviewToDoAPp */,
+				57AB171E386C74E1C5B29C57 /* GoogleService-Info.plist */,
 			);
 			sourceTree = "<group>";
 		};
@@ -151,6 +154,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				329DEA4AF4FF39185E1BA865 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
