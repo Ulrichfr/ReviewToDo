@@ -133,6 +133,7 @@ struct ContentView: View {
     }
 
     @StateObject private var dataManager = DataManager()
+    @EnvironmentObject var quickActionService: QuickActionService
     @State private var showingAddTest = false
     @State private var editingTest: ProductTest?
     @State private var selectedTab = 0
@@ -237,6 +238,12 @@ struct ContentView: View {
         .onChange(of: dataManager.hasLoadedData) {
             if dataManager.hasLoadedData {
                 checkFirstLaunch()
+            }
+        }
+        .onChange(of: quickActionService.shouldShowAddSheet) {
+            if quickActionService.shouldShowAddSheet {
+                showingAddTest = true
+                quickActionService.shouldShowAddSheet = false
             }
         }
         .alert("Supprimer ce test ?", isPresented: $showDeleteConfirmation, presenting: pendingDeletion) { test in

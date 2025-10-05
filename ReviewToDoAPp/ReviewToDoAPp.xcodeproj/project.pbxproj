@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AFB0D8E92E8C618200047EE1 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = AFB0D8E82E8C618200047EE1 /* GoogleService-Info.plist */; };
 		AFB0D8EC2E8C625600047EE1 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = AFB0D8EB2E8C625600047EE1 /* FirebaseFirestore */; };
 		AFB0D8EE2E8C625D00047EE1 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = AFB0D8ED2E8C625D00047EE1 /* FirebaseAuth */; };
 		AFB0D8F02E8C626300047EE1 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = AFB0D8EF2E8C626300047EE1 /* FirebaseAnalytics */; };
@@ -17,12 +16,14 @@
 
 /* Begin PBXFileReference section */
 		AF325F7F2E8C031400266633 /* ReviewToDoAPp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ReviewToDoAPp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		AFB0D8E82E8C618200047EE1 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		C8D88AEEA49E624C3AF4E7AE /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = ReviewToDoAPp/Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AF325F812E8C031400266633 /* ReviewToDoAPp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = ReviewToDoAPp;
 			sourceTree = "<group>";
 		};
@@ -49,8 +50,8 @@
 			children = (
 				AF325F812E8C031400266633 /* ReviewToDoAPp */,
 				AF325F802E8C031400266633 /* Products */,
-				AFB0D8E82E8C618200047EE1 /* GoogleService-Info.plist */,
 				AFB0D8EA2E8C625600047EE1 /* Frameworks */,
+				DF085A39DC2A5785E8B75C31 /* ReviewToDoAPp */,
 			);
 			sourceTree = "<group>";
 		};
@@ -69,6 +70,14 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		DF085A39DC2A5785E8B75C31 /* ReviewToDoAPp */ = {
+			isa = PBXGroup;
+			children = (
+				C8D88AEEA49E624C3AF4E7AE /* Info.plist */,
+			);
+			path = ReviewToDoAPp;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -79,6 +88,7 @@
 				AF325F7B2E8C031400266633 /* Sources */,
 				AF325F7C2E8C031400266633 /* Frameworks */,
 				AF325F7D2E8C031400266633 /* Resources */,
+				73FFA570FB3CE3751A42EEB8 /* Add Quick Actions */,
 			);
 			buildRules = (
 			);
@@ -141,11 +151,31 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AFB0D8E92E8C618200047EE1 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		73FFA570FB3CE3751A42EEB8 /* Add Quick Actions */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Add Quick Actions";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "#!/bin/bash\n\nPLIST=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Info.plist\"\n\nif [ -f \"$PLIST\" ]; then\n    # Add UIApplicationShortcutItems array\n    /usr/libexec/PlistBuddy -c \"Delete :UIApplicationShortcutItems\" \"$PLIST\" 2>/dev/null || true\n    /usr/libexec/PlistBuddy -c \"Add :UIApplicationShortcutItems array\" \"$PLIST\"\n    \n    # Add the shortcut item\n    /usr/libexec/PlistBuddy -c \"Add :UIApplicationShortcutItems:0 dict\" \"$PLIST\"\n    /usr/libexec/PlistBuddy -c \"Add :UIApplicationShortcutItems:0:UIApplicationShortcutItemType string ${PRODUCT_BUNDLE_IDENTIFIER}.newTest\" \"$PLIST\"\n    /usr/libexec/PlistBuddy -c \"Add :UIApplicationShortcutItems:0:UIApplicationShortcutItemTitle string 'Nouveau test'\" \"$PLIST\"\n    /usr/libexec/PlistBuddy -c \"Add :UIApplicationShortcutItems:0:UIApplicationShortcutItemSubtitle string 'Ajouter un test produit'\" \"$PLIST\"\n    /usr/libexec/PlistBuddy -c \"Add :UIApplicationShortcutItems:0:UIApplicationShortcutItemIconType string UIApplicationShortcutIconTypeAdd\" \"$PLIST\"\n    \n    echo \"✅ Quick Actions added to Info.plist\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		AF325F7B2E8C031400266633 /* Sources */ = {
