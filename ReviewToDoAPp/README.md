@@ -60,10 +60,10 @@ Application iOS de gestion de tests de produits tech avec synchronisation Fireba
 ### Build
 ```bash
 # Ouvrir le projet
-open ReviewToDoAPp.xcodeproj
+open ReviewToDo.xcodeproj
 
 # Ou builder via command line
-xcodebuild -project ReviewToDoAPp.xcodeproj -scheme ReviewToDoAPp -configuration Debug
+xcodebuild -project ReviewToDo.xcodeproj -scheme ReviewToDo -configuration Debug
 ```
 
 ## 🎨 Design
@@ -77,7 +77,7 @@ L'application utilise un thème sombre moderne avec :
 ## 📝 Structure du projet
 
 ```
-ReviewToDoAPp/
+ReviewToDo/
 ├── ContentView.swift          # Vue principale avec liste de tests
 ├── SettingsView.swift         # Paramètres utilisateur
 ├── OnboardingView.swift       # Écran d'onboarding
